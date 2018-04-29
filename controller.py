@@ -22,11 +22,11 @@ class Controller(nn.Module):
 
 	def reset_parameters(self):
 		# Initialize the linear layers
-		nn.init.xavier_uniform(self.fc1.weight, gain=1.4)
-		nn.init.normal(self.fc1.bias, std=0.01)
+		nn.init.xavier_uniform_(self.fc1.weight, gain=1.4)
+		nn.init.normal_(self.fc1.bias, std=0.01)
 
-		nn.init.xavier_uniform(self.fc2.weight, gain=1.4)
-		nn.init.normal(self.fc2.bias, std=0.01)
+		nn.init.xavier_uniform_(self.fc2.weight, gain=1.4)
+		nn.init.normal_(self.fc2.bias, std=0.01)
 
 
 	def forward(self, x, last_read):

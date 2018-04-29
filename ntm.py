@@ -15,6 +15,7 @@ class NTM(nn.Module):
 	def __init__(self, M, N, num_inputs, sequence_length, controller_out_dim, controller_hid_dim, learning_rate):
 		super(NTM, self).__init__()
 
+		print("Build Neural Turing machine\n")
 		self.num_inputs = num_inputs
 		self.M = M
 		self.N = N
@@ -64,7 +65,8 @@ class NTM(nn.Module):
 		return self.outputs
 
 	def _decode_read_vector(self, last_read):
-		o = F.sigmoid(self.fc_decode(last_read))
+		r_v = torch.squeeze(self.fc_decode(last_read))
+		o = F.sigmoid(r_v)
 		return o
 
 	def _read_write(self, controller_out):
@@ -85,11 +87,18 @@ class NTM(nn.Module):
 
 		mem_bias = nn.init.uniform_(Variable(torch.Tensor(self.M, self.N)), -1, 1)
 		self.memory.append(mem_bias)
-		self.mem_weights_read.append(F.softmax(Variable(torch.range(self.M, 1, -1))))
-		self.mem_weights_write.append(F.softmax(Variable(torch.range(self.M, 1, -1))))
+		self.mem_weights_read.append(F.softmax(Variable(torch.range(self.M, 1, -1)),dim=-1))
+		self.mem_weights_write.append(F.softmax(Variable(torch.range(self.M, 1, -1)), dim=-1))
 		self.last_read.append(F.tanh(torch.randn(self.N,)))
 
 	def reset_parameters(self):
 		# Initialize the linear layers
-		nn.init.xavier_uniform(self.fc_decode.weight, gain=1.4)
-		nn.init.normal(self.fc_decode.bias, std=0.01)
+		nn.init.xavier_uniform_(self.fc_decode.weight, gain=1.4)
+		nn.init.normal_(self.fc_decode.bias, std=0.01)
+
+	def calculate_num_params(self):
+		"""Returns the total number of parameters."""
+		num_params = 0
+		for p in self.parameters():
+			num_params += p.data.view(-1).size(0)
+		return num_params

@@ -84,22 +84,21 @@ if __name__ == "__main__":
 	criterion = torch.nn.BCELoss(size_average=True)
 	optimizer = torch.optim.RMSprop(model.parameters(), lr=args.learning_rate)
 
-	for param in model.parameters():
-		 print(type(param.data), param.size())
-
+	print("--------- Number of parameters -----------")
+	print(model.calculate_num_params())
 
 	for e in range(0, args.training_samples):
 		s_token, X, Y, e_token, zeros = generate_copy_data(args)
 		y_pred = model(s_token,X,e_token,zeros)
 
 		loss = 0
+		optimizer.zero_grad()
+
 		for t in range(0, args.sequence_length):
 			loss += criterion(y_pred[t],Y[t])
 
-		print(t, loss.item())
-		optimizer.zero_grad()
+		if (e % 500 == 0):
+			print("Loss: ", loss.item())
+
 		loss.backward(retain_graph=True)
 		optimizer.step()
-
-
-

@@ -38,7 +38,7 @@ class Memory(nn.Module):
 		a = torch.matmul(memory,k)
 		b = torch.norm(memory) * torch.norm(k) + 1e-16
 
-		w = F.softmax(β * (a / b))
+		w = F.softmax(β * (a / b), dim=-1)
 		return w
 
 	def _interpolate(self, wc, g, w_last):
@@ -64,22 +64,21 @@ class ReadHead(Memory):
 
 	def reset_parameters(self):
 		# Initialize the linear layers
-		nn.init.xavier_uniform(self.fc_read.weight, gain=1.4)
-		nn.init.normal(self.fc_read.bias, std=0.01)
+		nn.init.xavier_uniform_(self.fc_read.weight, gain=1.4)
+		nn.init.normal_(self.fc_read.bias, std=0.01)
 
 	def read(self, memory, w):
 		"""Read from memory (according to section 3.1)."""
 		return torch.matmul(w.unsqueeze(1), memory).squeeze(1)
 
 	def forward(self,x):
-
 		param = Variable(self.fc_read(x))
 		k, β, g, s, γ = torch.split(param,[self.N,1,1,3,1])
 
 		k = F.tanh(k)
 		β = F.softplus(β)
 		g = F.softplus(g)
-		s = F.softmax(s)
+		s = F.softmax(s, dim=-1)
 		γ = 1+ F.softplus(γ)
 
 		return k, β, g, s, γ
@@ -95,8 +94,8 @@ class WriteHead(Memory):
 
 	def reset_parameters(self):
 		# Initialize the linear layers
-		nn.init.xavier_uniform(self.fc_write.weight, gain=1.4)
-		nn.init.normal(self.fc_write.bias, std=0.01)
+		nn.init.xavier_uniform_(self.fc_write.weight, gain=1.4)
+		nn.init.normal_(self.fc_write.bias, std=0.01)
 
 	def write(self, memory, w, e, a):
 		"""write to memory (according to section 3.2)."""
@@ -120,7 +119,7 @@ class WriteHead(Memory):
 		k = F.tanh(k)
 		β = F.softplus(β)
 		g = F.softplus(g)
-		s = F.softmax(s)
+		s = F.softmax(s, dim=-1)
 		γ = 1+ F.softplus(γ)
 		a = F.tanh(a)
 		e = F.sigmoid(e)
