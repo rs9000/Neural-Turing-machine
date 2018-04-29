@@ -13,34 +13,32 @@ from ntm import NTM
 
 
 def generate_copy_data(args):
-
 	data = []
 	for _ in range(0, args.sequence_length):
 		data.append(np.round(np.random.rand(args.token_size).astype('f')))
 
 	start_token = np.zeros(shape=(args.token_size,), dtype=np.float32)
 	start_token[0] = 1
+	start_token = torch.from_numpy(start_token)
+
 	end_token = np.zeros(shape=(args.token_size,), dtype=np.float32)
 	end_token[1] = 1
+	end_token = torch.from_numpy(end_token)
+
 	X = np.stack(data, axis=0)
 	Y = X.copy()
 
-	return start_token, X, end_token, Y
-
-def init_copy_data(s_token, X, Y, e_token):
 	X_list = []
 	Y_list = []
 
-	s_token_t = torch.from_numpy(s_token)
 	for t in range(0, args.sequence_length):
 		X_list.append(torch.from_numpy(X[t]))
-	e_token_t = torch.from_numpy(e_token)
+
 	for t in range(0, args.sequence_length):
 		Y_list.append(torch.from_numpy(Y[t]))
 
 	zeros = torch.from_numpy(np.zeros(shape=(args.token_size,), dtype=np.float32))
-
-	return s_token_t, X_list, Y_list, e_token_t, zeros
+	return start_token, X_list, Y_list, end_token, zeros
 
 
 def parse_arguments():
@@ -91,8 +89,7 @@ if __name__ == "__main__":
 
 
 	for e in range(0, args.training_samples):
-		start, X, end, Y = generate_copy_data(args)
-		s_token, X, Y, e_token, zeros = init_copy_data(start,X,Y,end)
+		s_token, X, Y, e_token, zeros = generate_copy_data(args)
 		y_pred = model(s_token,X,e_token,zeros)
 
 		loss = 0
