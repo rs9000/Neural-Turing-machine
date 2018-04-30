@@ -4,4 +4,4 @@ Hard-coded for Copy-Task<br>
 NOT (yet) working<br>
 
 Implementation idea:<br>
-<img src="http://i65.tinypic.com/xnsxgl.png" width="600">
+<img src="https://i.imgur.com/pJcLb7m.png" width="600">
