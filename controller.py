@@ -30,7 +30,7 @@ class Controller(nn.Module):
 
 
 	def forward(self, x, last_read):
-		x = Variable(torch.cat((x, torch.squeeze(last_read)), 0))
+		x = Variable(torch.cat((x, torch.squeeze(last_read)), -1))
 		x = F.sigmoid(self.fc1(x))
 		x = F.sigmoid(self.fc2(x))
 		return x

@@ -17,6 +17,7 @@ class NTM(nn.Module):
 
 		print("Build Neural Turing machine\n")
 		self.num_inputs = num_inputs
+		self.num_outputs = num_inputs-1
 		self.M = M
 		self.N = N
 		self.sequence_length = sequence_length
@@ -36,38 +37,22 @@ class NTM(nn.Module):
 		self.X = []
 		self.Y = []
 
-		self.fc_decode = nn.Linear(self.N, self.num_inputs)
+		self.fc_out = nn.Linear(num_inputs+N, self.num_outputs)
 		self._initalize_state()
 		self.reset_parameters();
 
-	def forward(self, s_token, X, e_token, zeros):
+	def forward(self, X=None):
 
-		self.s_token = s_token
-		self.X = X
-		self.e_token = e_token
-		self.zeros = zeros
+		if X is None:
+			X = Variable(torch.zeros(self.num_inputs))
 
-		controller_out = self.controller(self.s_token, self.last_read[0])
+		controller_out = self.controller(X, self.last_read[-1])
 		self._read_write(controller_out)
 
-		for t in range(0, self.sequence_length):
-			controller_out = self.controller(self.X[t], self.last_read[-1])
-			self._read_write(controller_out)
+		out = Variable(torch.cat((X, torch.squeeze(self.last_read[-1])), -1))
+		out = F.sigmoid(self.fc_out(out))
 
-		controller_out = self.controller(self.e_token, self.last_read[-1])
-		self._read_write(controller_out)
-
-		for t in range(0, self.sequence_length):
-			controller_out = self.controller(self.zeros, self.last_read[-1])
-			self._read_write(controller_out)
-			self.outputs.append(self._decode_read_vector(self.last_read[-1]))
-
-		return self.outputs
-
-	def _decode_read_vector(self, last_read):
-		r_v = torch.squeeze(self.fc_decode(last_read))
-		o = F.sigmoid(r_v)
-		return o
+		return out
 
 	def _read_write(self, controller_out):
 		#READ
@@ -93,8 +78,8 @@ class NTM(nn.Module):
 
 	def reset_parameters(self):
 		# Initialize the linear layers
-		nn.init.xavier_uniform_(self.fc_decode.weight, gain=1.4)
-		nn.init.normal_(self.fc_decode.bias, std=0.01)
+		nn.init.xavier_uniform_(self.fc_out.weight, gain=1.4)
+		nn.init.normal_(self.fc_out.bias, std=0.01)
 
 	def calculate_num_params(self):
 		"""Returns the total number of parameters."""

@@ -13,32 +13,19 @@ from ntm import NTM
 
 
 def generate_copy_data(args):
-	data = []
-	for _ in range(0, args.sequence_length):
-		data.append(np.round(np.random.rand(args.token_size).astype('f')))
 
-	start_token = np.zeros(shape=(args.token_size,), dtype=np.float32)
-	start_token[0] = 1
-	start_token = torch.from_numpy(start_token)
+	seq_len = args.sequence_length
+	seq_width = args.token_size -1
+	seq = np.random.binomial(1, 0.5, (seq_len, seq_width))
+	seq = Variable(torch.from_numpy(seq))
 
-	end_token = np.zeros(shape=(args.token_size,), dtype=np.float32)
-	end_token[1] = 1
-	end_token = torch.from_numpy(end_token)
+	#Add delimiter token
+	inp = Variable(torch.zeros(seq_len + 1, seq_width + 1))
+	inp[:seq_len, :seq_width] = seq
+	inp[seq_len, seq_width] = 1.0
+	outp = seq.clone()
 
-	X = np.stack(data, axis=0)
-	Y = X.copy()
-
-	X_list = []
-	Y_list = []
-
-	for t in range(0, args.sequence_length):
-		X_list.append(torch.from_numpy(X[t]))
-
-	for t in range(0, args.sequence_length):
-		Y_list.append(torch.from_numpy(Y[t]))
-
-	zeros = torch.from_numpy(np.zeros(shape=(args.token_size,), dtype=np.float32))
-	return start_token, X_list, Y_list, end_token, zeros
+	return inp.float(), outp.float()
 
 
 def parse_arguments():
@@ -81,24 +68,28 @@ if __name__ == "__main__":
 			  controller_hid_dim=args.controller_hidden_dim,
 			  learning_rate=args.learning_rate)
 
-	criterion = torch.nn.BCELoss(size_average=True)
+	criterion = torch.nn.BCELoss()
 	optimizer = torch.optim.RMSprop(model.parameters(), lr=args.learning_rate)
 
 	print("--------- Number of parameters -----------")
 	print(model.calculate_num_params())
 
 	for e in range(0, args.training_samples):
-		s_token, X, Y, e_token, zeros = generate_copy_data(args)
-		y_pred = model(s_token,X,e_token,zeros)
+		X, Y = generate_copy_data(args)
 
 		loss = 0
 		optimizer.zero_grad()
 
 		for t in range(0, args.sequence_length):
-			loss += criterion(y_pred[t],Y[t])
+			model(X[t])
+
+		y_pred = Variable(torch.zeros(Y.size()))
+		for i in range(args.sequence_length):
+			y_pred[i]= model()
+
+		loss += criterion(y_pred, Y)
+		loss.backward()
+		optimizer.step()
 
 		if (e % 500 == 0):
 			print("Loss: ", loss.item())
-
-		loss.backward(retain_graph=True)
-		optimizer.step()
