@@ -63,7 +63,7 @@ if __name__ == "__main__":
 	model =  NTM(M=args.memory_capacity,
 			  N=args.memory_vector_size,
 			  num_inputs=args.token_size,
-			  sequence_length=args.sequence_length,
+			  num_outputs=args.token_size-1,
 			  controller_out_dim=args.controller_output_dim,
 			  controller_hid_dim=args.controller_hidden_dim,
 			  learning_rate=args.learning_rate)
@@ -73,21 +73,25 @@ if __name__ == "__main__":
 
 	print("--------- Number of parameters -----------")
 	print(model.calculate_num_params())
+	print("--------- Start training -----------")
 
 	for e in range(0, args.training_samples):
 		X, Y = generate_copy_data(args)
+		inp_seq_len = X.size(0)
+		outp_seq_len = Y.size(0)
 
-		loss = 0
 		optimizer.zero_grad()
 
-		for t in range(0, args.sequence_length):
+		#Input rete: sequenza
+		for t in range(0, inp_seq_len):
 			model(X[t])
 
+		#Input rete: null
 		y_pred = Variable(torch.zeros(Y.size()))
-		for i in range(args.sequence_length):
+		for i in range(outp_seq_len):
 			y_pred[i]= model()
 
-		loss += criterion(y_pred, Y)
+		loss = criterion(y_pred, Y)
 		loss.backward()
 		optimizer.step()
 

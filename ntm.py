@@ -12,32 +12,27 @@ from memory import ReadHead, WriteHead
 from controller import Controller
 
 class NTM(nn.Module):
-	def __init__(self, M, N, num_inputs, sequence_length, controller_out_dim, controller_hid_dim, learning_rate):
+	def __init__(self, M, N, num_inputs, num_outputs, controller_out_dim, controller_hid_dim, learning_rate):
 		super(NTM, self).__init__()
 
-		print("Build Neural Turing machine\n")
+		print("----------- Build Neural Turing machine -----------")
 		self.num_inputs = num_inputs
-		self.num_outputs = num_inputs-1
+		self.num_outputs = num_outputs
 		self.M = M
 		self.N = N
-		self.sequence_length = sequence_length
+
 		self.learning_rate = learning_rate
-		self.controller_out_dim = controller_out_dim
 
-		self.controller = Controller(num_inputs+N, self.controller_out_dim, controller_hid_dim)
-		self.read_head = ReadHead(self.M, self.N, self.controller_out_dim)
-		self.write_head = WriteHead(self.M, self.N, self.controller_out_dim)
+		self.controller = Controller(self.num_inputs+N, controller_out_dim, controller_hid_dim)
+		self.read_head = ReadHead(self.M, self.N, controller_out_dim)
+		self.write_head = WriteHead(self.M, self.N, controller_out_dim)
 
-		self.outputs = []
 		self.memory = []
 		self.last_read = []
 		self.mem_weights_read = []
 		self.mem_weights_write = []
 
-		self.X = []
-		self.Y = []
-
-		self.fc_out = nn.Linear(num_inputs+N, self.num_outputs)
+		self.fc_out = nn.Linear(self.num_inputs+N, self.num_outputs)
 		self._initalize_state()
 		self.reset_parameters();
 

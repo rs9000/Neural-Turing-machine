@@ -59,6 +59,7 @@ class ReadHead(Memory):
 	def __init__(self, M, N, controller_out):
 		super(ReadHead, self).__init__(M, N, controller_out)
 
+		print("--- Initialize Memory: ReadHead")
 		self.fc_read = nn.Linear(controller_out, self.read_lengths)
 		self.reset_parameters()
 
@@ -89,6 +90,7 @@ class WriteHead(Memory):
 	def __init__(self, M, N, controller_out):
 		super(WriteHead, self).__init__(M, N, controller_out)
 
+		print("--- Initialize Memory: WriteHead")
 		self.fc_write = nn.Linear(controller_out, self.write_lengths)
 		self.reset_parameters()
 

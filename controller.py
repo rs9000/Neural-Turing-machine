@@ -12,10 +12,7 @@ class Controller(nn.Module):
 	def __init__(self, num_inputs, num_outputs, num_hiddens):
 		super(Controller, self).__init__()
 
-		self.num_inputs = num_inputs
-		self.num_outputs = num_outputs
-		self.num_hiddens = num_hiddens
-
+		print("--- Initialize Controller")
 		self.fc1 = nn.Linear(num_inputs, num_hiddens)
 		self.fc2 = nn.Linear(num_hiddens, num_outputs)
 		self.reset_parameters()
