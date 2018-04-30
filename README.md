@@ -1,6 +1,6 @@
 # Neural-Turing-machine
 NTM in PyTorch<br>
-Hard-coded for Copy-Task<br>
+https://arxiv.org/pdf/1410.5401.pdf
 NOT (yet) working<br>
 
 Implementation idea:<br>
