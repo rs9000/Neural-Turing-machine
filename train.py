@@ -10,7 +10,7 @@ import sys
 
 import argparse
 from ntm import NTM
-
+from logger import Logger
 
 def generate_copy_data(args):
 
@@ -26,6 +26,12 @@ def generate_copy_data(args):
 	outp = seq.clone()
 
 	return inp.float(), outp.float()
+
+
+def clip_grads(net):
+	parameters = list(filter(lambda p: p.grad is not None, net.parameters()))
+	for p in parameters:
+		p.grad.data.clamp_(args.min_grad, args.max_grad)
 
 
 def parse_arguments():
@@ -50,7 +56,7 @@ def parse_arguments():
 						help='Minimum value of gradient clipping', metavar='')
 	parser.add_argument('--max_grad', type=float, default=10.,
 						help='Maximum value of gradient clipping', metavar='')
-	parser.add_argument('--logdir', type=str, default='logs',
+	parser.add_argument('--logdir', type=str, default='./logs',
 						help='The directory where to store logs', metavar='')
 
 	return parser.parse_args()
@@ -59,6 +65,8 @@ def parse_arguments():
 if __name__ == "__main__":
 
 	args = parse_arguments()
+
+	logger = Logger(args.logdir)
 
 	model =  NTM(M=args.memory_capacity,
 			  N=args.memory_vector_size,
@@ -75,6 +83,9 @@ if __name__ == "__main__":
 	print(model.calculate_num_params())
 	print("--------- Start training -----------")
 
+	losses = []
+
+	#args.training_samples
 	for e in range(0, args.training_samples):
 		X, Y = generate_copy_data(args)
 		inp_seq_len = X.size(0)
@@ -93,7 +104,16 @@ if __name__ == "__main__":
 
 		loss = criterion(y_pred, Y)
 		loss.backward()
+		clip_grads(model)
 		optimizer.step()
+		losses += [loss.item()]
 
 		if (e % 500 == 0):
-			print("Loss: ", loss.item())
+			mean_loss = np.array(losses[-500:]).mean()
+			print("Mean Loss: ", mean_loss)
+
+		if(e % 1000 == 0):
+			value = loss.item()
+			mean_loss = np.array(losses[-1000:]).mean()
+			logger.scalar_summary("Mean Loss", mean_loss, e)
+			losses = []
