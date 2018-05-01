@@ -23,7 +23,7 @@ class NTM(nn.Module):
 
 		self.learning_rate = learning_rate
 
-		self.controller = Controller(self.num_inputs+N, controller_out_dim, controller_hid_dim)
+		self.controller = Controller(self.num_inputs+self.N, controller_out_dim, controller_hid_dim)
 		self.read_head = ReadHead(self.M, self.N, controller_out_dim)
 		self.write_head = WriteHead(self.M, self.N, controller_out_dim)
 
@@ -60,9 +60,17 @@ class NTM(nn.Module):
 		self.mem_weights_write.append(w)
 		self.memory.append(mem)
 
+		#Remove old stuff to save RAM
+		if len(self.mem_weights_read) > 3:
+			self.mem_weights_read = self.mem_weights_read[-2:]
+			self.last_read = self.last_read[-2:]
+			self.mem_weights_write = self.mem_weights_write[-2:]
+			self.memory = self.memory[-2:]
+
 	def _initalize_state(self):
 
-		mem_bias = nn.init.uniform_(Variable(torch.Tensor(self.M, self.N)), -1, 1)
+		stdev = 1 / (np.sqrt(self.N + self.M))
+		mem_bias = nn.init.uniform_(Variable(torch.Tensor(self.M, self.N)), -stdev, stdev)
 		self.memory.append(mem_bias)
 		self.mem_weights_read.append(F.softmax(Variable(torch.range(self.M, 1, -1)),dim=-1))
 		self.mem_weights_write.append(F.softmax(Variable(torch.range(self.M, 1, -1)), dim=-1))
@@ -71,7 +79,7 @@ class NTM(nn.Module):
 	def reset_parameters(self):
 		# Initialize the linear layers
 		nn.init.xavier_uniform_(self.fc_out.weight, gain=1.4)
-		nn.init.normal_(self.fc_out.bias, std=0.01)
+		nn.init.normal_(self.fc_out.bias, std=0.5)
 
 	def calculate_num_params(self):
 		"""Returns the total number of parameters."""
