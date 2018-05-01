@@ -51,17 +51,14 @@ class NTM(nn.Module):
 
 	def _read_write(self, controller_out):
 		#READ
-		# Step: Genera parametri, genera pesi, reading
-		k, β, g, s, γ = self.read_head(controller_out)
-		self.mem_weights_read.append(self.read_head.address(k, β, g, s, γ, self.memory[-1], self.mem_weights_read[-1]))
-		self.last_read.append(self.read_head.read(self.memory[-1], self.mem_weights_read[-1]))
+		mem, w = self.read_head(controller_out, self.memory[-1], self.mem_weights_read[-1])
+		self.mem_weights_read.append(w)
+		self.last_read.append(mem)
 
 		#WRITE
-		# Step: Genera parametri, genera pesi, writing
-		k, β, g, s, γ, a, e = self.write_head(controller_out)
-		self.mem_weights_write.append(self.read_head.address(k, β, g, s, γ, self.memory[-1], self.mem_weights_write[-1]))
-		memory_update = self.write_head.write(self.memory[-1], self.mem_weights_write[-1], e , a)
-		self.memory.append(memory_update)
+		mem, w = self.write_head(controller_out, self.memory[-1], self.mem_weights_write[-1])
+		self.mem_weights_write.append(w)
+		self.memory.append(mem)
 
 	def _initalize_state(self):
 

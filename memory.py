@@ -72,7 +72,7 @@ class ReadHead(Memory):
 		"""Read from memory (according to section 3.1)."""
 		return torch.matmul(w.unsqueeze(1), memory).squeeze(1)
 
-	def forward(self,x):
+	def forward(self,x, memory, w_last):
 		param = Variable(self.fc_read(x))
 		k, β, g, s, γ = torch.split(param,[self.N,1,1,3,1])
 
@@ -82,7 +82,9 @@ class ReadHead(Memory):
 		s = F.softmax(s, dim=-1)
 		γ = 1+ F.softplus(γ)
 
-		return k, β, g, s, γ
+		w = self.address(k, β, g, s, γ, memory, w_last)
+		mem = self.read(memory, w)
+		return mem, w
 
 
 class WriteHead(Memory):
@@ -113,7 +115,7 @@ class WriteHead(Memory):
 
 		return memory_update
 
-	def forward(self,x):
+	def forward(self, x, memory, w_last):
 
 		param = Variable(self.fc_write(x))
 		k, β, g, s, γ, a, e = torch.split(param,[self.N,1,1,3,1,self.N,self.N])
@@ -126,7 +128,9 @@ class WriteHead(Memory):
 		a = F.tanh(a)
 		e = F.sigmoid(e)
 
-		return k, β, g, s, γ, a, e
+		w = self.address(k, β, g, s, γ, memory, w_last)
+		mem = self.write(memory, w, e, a)
+		return mem, w
 
 
 def _convolve(w, s):
