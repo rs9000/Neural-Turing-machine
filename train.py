@@ -40,9 +40,9 @@ def parse_arguments():
 	parser.add_argument('--sequence_length', type=int, default=3, help='The length of the sequence to copy', metavar='')
 	parser.add_argument('--token_size', type=int, default=10,
 						help='The size of the tokens making the sequence', metavar='')
-	parser.add_argument('--memory_capacity', type=int, default=64,
+	parser.add_argument('--memory_capacity', type=int, default=20,
 						help='Number of records that can be stored in memory', metavar='')
-	parser.add_argument('--memory_vector_size', type=int, default=128,
+	parser.add_argument('--memory_vector_size', type=int, default=64,
 						help='Dimensionality of records stored in memory', metavar='')
 	parser.add_argument('--training_samples', type=int, default=999999,
 						help='Number of training samples', metavar='')

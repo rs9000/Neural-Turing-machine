@@ -51,12 +51,12 @@ class NTM(nn.Module):
 
 	def _read_write(self, controller_out):
 		#READ
-		mem, w = self.read_head(controller_out, self.memory[-1], self.mem_weights_read[-1])
+		mem, w = self.read_head(controller_out, self.memory[-1])
 		self.mem_weights_read.append(w)
 		self.last_read.append(mem)
 
 		#WRITE
-		mem, w = self.write_head(controller_out, self.memory[-1], self.mem_weights_write[-1])
+		mem, w = self.write_head(controller_out, self.memory[-1])
 		self.mem_weights_write.append(w)
 		self.memory.append(mem)
 
@@ -72,8 +72,6 @@ class NTM(nn.Module):
 		stdev = 1 / (np.sqrt(self.N + self.M))
 		mem_bias = nn.init.uniform_(Variable(torch.Tensor(self.M, self.N)), -stdev, stdev)
 		self.memory.append(mem_bias)
-		self.mem_weights_read.append(F.softmax(Variable(torch.range(self.M, 1, -1)),dim=-1))
-		self.mem_weights_write.append(F.softmax(Variable(torch.range(self.M, 1, -1)), dim=-1))
 		self.last_read.append(F.tanh(torch.randn(self.N,)))
 
 	def reset_parameters(self):
