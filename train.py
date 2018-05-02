@@ -15,14 +15,15 @@ from logger import Logger
 def generate_copy_data(args):
 
 	seq_len = args.sequence_length
-	seq_width = args.token_size -1
+	seq_width = args.token_size
 	seq = np.random.binomial(1, 0.5, (seq_len, seq_width))
 	seq = Variable(torch.from_numpy(seq))
 
 	#Add delimiter token
-	inp = Variable(torch.zeros(seq_len + 1, seq_width + 1))
-	inp[:seq_len, :seq_width] = seq
-	inp[seq_len, seq_width] = 1.0
+	inp = Variable(torch.zeros(seq_len + 2, seq_width))
+	inp[1:seq_len+1, :seq_width] = seq
+	inp[0, 0] = 1.0
+	inp[seq_len+1, seq_width-1] = 1.0
 	outp = seq.clone()
 
 	return inp.float(), outp.float()
@@ -40,9 +41,9 @@ def parse_arguments():
 	parser.add_argument('--sequence_length', type=int, default=3, help='The length of the sequence to copy', metavar='')
 	parser.add_argument('--token_size', type=int, default=10,
 						help='The size of the tokens making the sequence', metavar='')
-	parser.add_argument('--memory_capacity', type=int, default=20,
+	parser.add_argument('--memory_capacity', type=int, default=64,
 						help='Number of records that can be stored in memory', metavar='')
-	parser.add_argument('--memory_vector_size', type=int, default=64,
+	parser.add_argument('--memory_vector_size', type=int, default=128,
 						help='Dimensionality of records stored in memory', metavar='')
 	parser.add_argument('--training_samples', type=int, default=999999,
 						help='Number of training samples', metavar='')
@@ -71,7 +72,7 @@ if __name__ == "__main__":
 	model =  NTM(M=args.memory_capacity,
 			  N=args.memory_vector_size,
 			  num_inputs=args.token_size,
-			  num_outputs=args.token_size-1,
+			  num_outputs=args.token_size,
 			  controller_out_dim=args.controller_output_dim,
 			  controller_hid_dim=args.controller_hidden_dim,
 			  learning_rate=args.learning_rate)
