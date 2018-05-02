@@ -42,12 +42,10 @@ class Memory(nn.Module):
 		return w
 
 	def _similarity(self, k, β, memory):
-		k = k.view(-1, 1)
+		k = k.view(1, -1)
 		#Similarità coseno
-		a = torch.matmul(memory,k)
-		b = torch.norm(memory) * torch.norm(k) + 1e-16
-
-		w = F.softmax(β * (a / b), dim=-1)
+		w = F.cosine_similarity(memory,k,-1,1e-16)
+		w = F.softmax(β * w, dim=-1)
 		return w
 
 	def _interpolate(self, wc, g, w_last):
