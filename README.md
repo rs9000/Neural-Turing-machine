@@ -4,4 +4,4 @@ https://arxiv.org/pdf/1410.5401.pdf <br>
 NOT (yet) working<br>
 
 Implementation idea:<br>
-<img src="https://i.imgur.com/pJcLb7m.png" width="800">
+<img src="http://i64.tinypic.com/2hqrmlc.png" width="800">
