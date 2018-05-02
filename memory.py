@@ -1,149 +1,82 @@
 import torch
-from torch import nn
 from torch.autograd import Variable
-import torch.optim as optim
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
+from torch import nn
 import numpy as np
-import sys
 
-class Memory(nn.Module):
-	def __init__(self, M, N, controller_out):
-		super(Memory, self).__init__()
+class NTMMemory(nn.Module):
+
+	def __init__(self, N, M):
+		#Inizializzazione memoria dim NxM
+		super(NTMMemory, self).__init__()
 
 		self.N = N
 		self.M = M
-		self.read_lengths = self.N+1+1+3+1
-		self.write_lengths = self.N+self.N
-		self.controller_out = controller_out
 
-		self.w_last = torch.zeros([self.M,], dtype=torch.float32)
+		# The memory bias allows the heads to learn how to initially address
+		# memory locations by content
 
-		self.fc_read = nn.Linear(controller_out, self.read_lengths)
-		self.reset_parameters()
+		self.mem_bias = Variable(torch.Tensor(N, M))
+		nn.init.uniform(self.mem_bias, -1, 1)
+
+	def reset(self, batch_size):
+		"""Initialize memory from bias, for start-of-sequence."""
+		self.batch_size = batch_size
+		self.memory = self.mem_bias.clone().repeat(batch_size, 1, 1)
 
 	def size(self):
 		return self.N, self.M
 
-	def reset_parameters(self):
-		# Initialize the linear layers
-		nn.init.xavier_uniform_(self.fc_read.weight, gain=1.4)
-		nn.init.normal_(self.fc_read.bias, std=0.01)
+	def read(self, w):
+		#Read (paper 3.1)
+		#Moltiplico i pesi per la memoria
+		return torch.matmul(w.unsqueeze(1), self.memory).squeeze(1)
 
-	def address(self, k, β, g, s, γ, memory, w_last):
+	def write(self, w, e, a):
+		#Write (paper 3.2)
+		self.prev_mem = self.memory
+		self.memory = Variable(torch.Tensor(self.batch_size, self.N, self.M))
+		erase_step = self.prev_mem * (1 - (torch.matmul(w.unsqueeze(-1), e.unsqueeze(1))))
+		add_step = erase_step + torch.matmul(w.unsqueeze(-1), a.unsqueeze(1))
+		self.memory = add_step
+
+	def address(self, k, β, g, s, γ, w_prev):
+		#Addressing (paper 3.3)
 
 		# Content focus
-		wc = self._similarity(k, β, memory)
+		wc = self._similarity(k, β)
 		# Location focus
-		wg = self._interpolate(wc, g, w_last)
+		wg = self._interpolate(w_prev, wc, g)
 		ŵ = self._shift(wg, s)
 		w = self._sharpen(ŵ, γ)
 
 		return w
 
-	def _similarity(self, k, β, memory):
-		k = k.view(1, -1)
-		#Similarità coseno
-		w = F.cosine_similarity(memory,k,-1,1e-16)
-		w = F.softmax(β * w, dim=-1)
+	def _similarity(self, k, β):
+		k = k.view(self.batch_size, 1, -1)
+
+		sim = F.cosine_similarity(self.memory,k,-1,1e-16)
+		w = F.softmax(β * sim, dim=1)
+		print(w)
 		return w
 
-	def _interpolate(self, wc, g, w_last):
-		return g * torch.squeeze(wc) + (1 - g) * w_last
+	def _interpolate(self, w_prev, wc, g):
+		return g * wc + (1 - g) * w_prev
 
 	def _shift(self, wg, s):
 		result = Variable(torch.zeros(wg.size()))
-		result = _convolve(wg, s)
+		for b in range(self.batch_size):
+			result[b] = _convolve(wg[b], s[b])
 		return result
 
 	def _sharpen(self, ŵ, γ):
 		w = ŵ ** γ
-		w = torch.div(w, torch.sum(w, dim=-1).view(-1, 1) + 1e-16)
+		w = torch.div(w, torch.sum(w, dim=1).view(-1, 1) + 1e-16)
 		return w
-
-class ReadHead(Memory):
-
-	def __init__(self, M, N, controller_out):
-		super(ReadHead, self).__init__(M, N, controller_out)
-
-		print("--- Initialize Memory: ReadHead")
-
-
-	def read(self, memory, w):
-		"""Read from memory (according to section 3.1)."""
-		return torch.matmul(w, memory)
-
-	def forward(self,x, memory):
-		param = Variable(self.fc_read(x))
-		k, β, g, s, γ = torch.split(param,[self.N,1,1,3,1])
-
-		k = F.tanh(k)
-		β = F.softplus(β)
-		g = F.softplus(g)
-		s = F.softmax(s, dim=-1)
-		γ = 1+ F.softplus(γ)
-
-		w = self.address(k, β, g, s, γ, memory, self.w_last)
-		self.w_last = w
-		mem = self.read(memory, w)
-		return mem, w
-
-
-class WriteHead(Memory):
-
-	def __init__(self, M, N, controller_out):
-		super(WriteHead, self).__init__(M, N, controller_out)
-
-		print("--- Initialize Memory: WriteHead")
-
-		self.fc_write = nn.Linear(controller_out, self.write_lengths)
-		self.reset_parameters2()
-
-	def reset_parameters2(self):
-		# Initialize the linear layers
-		nn.init.xavier_uniform_(self.fc_write.weight, gain=1.4)
-		nn.init.normal_(self.fc_write.bias, std=0.01)
-
-	def write(self, memory, w, e, a):
-		"""write to memory (according to section 3.2)."""
-		w = w.view(-1,1)
-		e = e.view(1,-1)
-		a = a.view(1,-1)
-
-		#Moltiplicazione point-wise cazzo!
-		erase = torch.matmul(w,e)
-		add = torch.matmul(w,a)
-		m_tilde = memory*(1-erase)
-		memory_update = m_tilde + add
-
-		return memory_update
-
-	def forward(self, x, memory):
-
-		param_r = Variable(self.fc_read(x))
-		param_w = Variable(self.fc_write(x))
-
-		k, β, g, s, γ = torch.split(param_r,[self.N,1,1,3,1])
-		a, e = torch.split(param_w,[self.N,self.N])
-
-		k = F.tanh(k)
-		β = F.softplus(β)
-		g = F.softplus(g)
-		s = F.softmax(s, dim=-1)
-		γ = 1+ F.softplus(γ)
-		a = F.tanh(a)
-		e = F.sigmoid(e)
-
-		w = self.address(k, β, g, s, γ, memory, self.w_last)
-		self.w_last = w
-		mem = self.write(memory, w, e, a)
-		return mem, w
 
 
 def _convolve(w, s):
-	"""Circular convolution implementation."""
-	assert s.size(0) == 3
-	w = torch.squeeze(w)
-	t = torch.cat([w[-1:], w, w[:1]])
-	c = F.conv1d(t.view(1, 1, -1), s.view(1, 1,-1)).view(-1)
-	return c
+		assert s.size(0) == 3
+		t = torch.cat([w[-1:], w, w[:1]])
+		c = F.conv1d(t.view(1, 1, -1), s.view(1, 1, -1)).view(-1)
+		return c
