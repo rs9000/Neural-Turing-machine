@@ -52,19 +52,15 @@ class NTM(nn.Module):
 	def _read_write(self, controller_out):
 		#READ
 		mem, w = self.read_head(controller_out, self.memory[-1])
-		self.mem_weights_read.append(w)
 		self.last_read.append(mem)
 
 		#WRITE
 		mem, w = self.write_head(controller_out, self.memory[-1])
-		self.mem_weights_write.append(w)
 		self.memory.append(mem)
 
 		#Remove old stuff to save RAM
-		if len(self.mem_weights_read) > 3:
-			self.mem_weights_read = self.mem_weights_read[-2:]
+		if len(self.last_read) > 3:
 			self.last_read = self.last_read[-2:]
-			self.mem_weights_write = self.mem_weights_write[-2:]
 			self.memory = self.memory[-2:]
 
 	def _initalize_state(self):
