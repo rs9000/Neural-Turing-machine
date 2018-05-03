@@ -1,83 +1,67 @@
 import torch
-import torch
 from torch import nn
-from torch.autograd import Variable
-import torch.optim as optim
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
-import sys
 
 from memory import ReadHead, WriteHead
 from controller import Controller
 
+
 class NTM(nn.Module):
-	def __init__(self, M, N, num_inputs, num_outputs, controller_out_dim, controller_hid_dim, learning_rate):
-		super(NTM, self).__init__()
+    def __init__(self, M, N, num_inputs, num_outputs, controller_out_dim, controller_hid_dim, learning_rate):
+        super(NTM, self).__init__()
 
-		print("----------- Build Neural Turing machine -----------")
-		self.num_inputs = num_inputs
-		self.num_outputs = num_outputs
-		self.M = M
-		self.N = N
+        print("----------- Build Neural Turing machine -----------")
+        self.num_inputs = num_inputs
+        self.num_outputs = num_outputs
+        self.M = M
+        self.N = N
 
-		self.learning_rate = learning_rate
+        self.memory = torch.zeros(self.M, self.N)
+        self.last_read = torch.zeros(1, self.N)
 
-		self.controller = Controller(self.num_inputs+self.N, controller_out_dim, controller_hid_dim)
-		self.read_head = ReadHead(self.M, self.N, controller_out_dim)
-		self.write_head = WriteHead(self.M, self.N, controller_out_dim)
+        self.controller = Controller(self.num_inputs + self.N, controller_out_dim, controller_hid_dim)
+        self.read_head = ReadHead(self.M, self.N, controller_out_dim)
+        self.write_head = WriteHead(self.M, self.N, controller_out_dim)
 
-		self.memory = []
-		self.last_read = []
-		self.mem_weights_read = []
-		self.mem_weights_write = []
+        self.fc_out = nn.Linear(self.num_inputs + N, self.num_outputs)
+        self.reset_parameters()
 
-		self.fc_out = nn.Linear(self.num_inputs+N, self.num_outputs)
-		self._initalize_state()
-		self.reset_parameters();
+    def forward(self, X=None):
 
-	def forward(self, X=None):
+        if X is None:
+            X = torch.zeros(1, self.num_inputs)
 
-		if X is None:
-			X = Variable(torch.zeros(self.num_inputs))
+        controller_out = self.controller(X, self.last_read)
+        self._read_write(controller_out)
 
-		controller_out = self.controller(X, self.last_read[-1])
-		self._read_write(controller_out)
+        out = torch.cat((X, self.last_read), -1)
+        out = F.sigmoid(self.fc_out(out))
 
-		out = Variable(torch.cat((X, torch.squeeze(self.last_read[-1])), -1))
-		out = F.sigmoid(self.fc_out(out))
+        return out
 
-		return out
+    def _read_write(self, controller_out):
+        # READ
+        read, w = self.read_head(controller_out, self.memory)
+        self.last_read = read
 
-	def _read_write(self, controller_out):
-		#READ
-		mem, w = self.read_head(controller_out, self.memory[-1])
-		self.last_read.append(mem)
+        # WRITE
+        mem, w = self.write_head(controller_out, self.memory)
+        self.memory = mem
 
-		#WRITE
-		mem, w = self.write_head(controller_out, self.memory[-1])
-		self.memory.append(mem)
+    def initalize_state(self):
+        stdev = 1 / (np.sqrt(self.N + self.M))
+        self.memory = nn.init.uniform_((torch.Tensor(self.M, self.N)), -stdev, stdev)
+        self.last_read = F.tanh(torch.randn(1, self.N))
 
-		#Remove old stuff to save RAM
-		if len(self.last_read) > 3:
-			self.last_read = self.last_read[-2:]
-			self.memory = self.memory[-2:]
+    def reset_parameters(self):
+        # Initialize the linear layers
+        nn.init.xavier_uniform_(self.fc_out.weight, gain=1.4)
+        nn.init.normal_(self.fc_out.bias, std=0.5)
 
-	def _initalize_state(self):
-
-		stdev = 1 / (np.sqrt(self.N + self.M))
-		mem_bias = nn.init.uniform_(Variable(torch.Tensor(self.M, self.N)), -stdev, stdev)
-		self.memory.append(mem_bias)
-		self.last_read.append(F.tanh(torch.randn(self.N,)))
-
-	def reset_parameters(self):
-		# Initialize the linear layers
-		nn.init.xavier_uniform_(self.fc_out.weight, gain=1.4)
-		nn.init.normal_(self.fc_out.bias, std=0.5)
-
-	def calculate_num_params(self):
-		"""Returns the total number of parameters."""
-		num_params = 0
-		for p in self.parameters():
-			num_params += p.data.view(-1).size(0)
-		return num_params
+    def calculate_num_params(self):
+        """Returns the total number of parameters."""
+        num_params = 0
+        for p in self.parameters():
+            num_params += p.data.view(-1).size(0)
+        return num_params
