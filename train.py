@@ -1,25 +1,23 @@
 import torch
-from torch.autograd import Variable
 import numpy as np
 import argparse
 from ntm import NTM
 from logger import Logger
-
 from time import time
-
 
 def generate_copy_data(args):
     seq_len = args.sequence_length
     seq_width = args.token_size
     seq = np.random.binomial(1, 0.5, (seq_len, seq_width))
-    seq = Variable(torch.from_numpy(seq))
+    seq = torch.from_numpy(seq)
+    seq.requires_grad = True
 
     # Add delimiter token
-    inp = Variable(torch.zeros(seq_len + 2, seq_width))
+    inp = torch.zeros(seq_len + 2, seq_width)
     inp[1:seq_len + 1, :seq_width] = seq.clone()
     inp[0, 0] = 1.0
     inp[seq_len + 1, seq_width - 1] = 1.0
-    outp = seq.clone()
+    outp = seq.data.clone()
 
     # Add batch singleton dimension
     inp = torch.unsqueeze(inp, dim=0)
@@ -27,11 +25,9 @@ def generate_copy_data(args):
 
     return inp.float(), outp.float()
 
-
 def clip_grads(net):
     for p in net.parameters():
         p.grad.data.clamp_(args.min_grad, args.max_grad)
-
 
 def parse_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -72,7 +68,7 @@ if __name__ == "__main__":
                 num_outputs=args.token_size,
                 controller_out_dim=args.controller_output_dim,
                 controller_hid_dim=args.controller_hidden_dim,
-                learning_rate=args.learning_rate)
+                )
 
     criterion = torch.nn.BCELoss()
     optimizer = torch.optim.RMSprop(model.parameters(), lr=args.learning_rate)
@@ -85,38 +81,34 @@ if __name__ == "__main__":
 
     # args.training_samples
     for e in range(0, args.training_samples):
-
         tmp = time()
-
         model.initalize_state()
         optimizer.zero_grad()
 
-        X, Y = generate_copy_data(args)
         inp_seq_len = args.sequence_length + 2
-        outp_seq_len = args.sequence_length
+        out_seq_len = args.sequence_length
+
+        X, Y = generate_copy_data(args)
 
         # Input rete: sequenza
         for t in range(0, inp_seq_len):
             model(X[:, t])
 
         # Input rete: null
-        y_pred = Variable(torch.zeros(Y.size()))
-        for i in range(outp_seq_len):
+        y_pred = torch.zeros(Y.size())
+        for i in range(0, out_seq_len):
             y_pred[:, i] = model()
 
         loss = criterion(y_pred, Y)
         loss.backward()
         clip_grads(model)
         optimizer.step()
-        #losses += [loss.item()]
+        losses += [loss.item()]
 
-        #if (e % 2 == 0):
-            #mean_loss = np.array(losses[-500:]).mean()
-            #print("Mean Loss: ", loss.item())
+        if (e % 50 == 0):
+            mean_loss = np.array(losses[-50:]).mean()
+            print("Loss: ", loss.item())
+            logger.scalar_summary("Mean Loss", loss.item(), e)
+            losses = []
 
-        #if (e % 1000 == 0):
-            #mean_loss = np.array(losses[-1000:]).mean()
-            #logger.scalar_summary("Mean Loss", loss.item(), e)
-            #losses = []
-
-        print('Time elapsed: {}'.format(time() - tmp))
+        #print('Time elapsed: {}'.format(time() - tmp))

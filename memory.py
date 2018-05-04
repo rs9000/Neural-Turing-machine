@@ -14,6 +14,9 @@ class Memory(nn.Module):
 
         self.w_last = torch.zeros([1, self.M], dtype=torch.float32)
 
+    def reset_memory(self):
+        self.w_last = torch.zeros([1, self.M], dtype=torch.float32)
+
     def address(self, k, β, g, s, γ, memory, w_last):
         # Content focus
         wc = self._similarity(k, β, memory)
