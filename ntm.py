@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import numpy as np
-
 from memory import ReadHead, WriteHead
 from controller import Controller
 
@@ -51,10 +50,6 @@ class NTM(nn.Module):
 
     def initalize_state(self):
         stdev = 1 / (np.sqrt(self.N + self.M))
-
-        self.memory = torch.zeros(self.M, self.N)
-        self.last_read = torch.zeros(1, self.N)
-
         self.memory = nn.init.uniform_((torch.Tensor(self.M, self.N)), -stdev, stdev)
         self.last_read = F.tanh(torch.randn(1, self.N))
 
@@ -65,6 +60,9 @@ class NTM(nn.Module):
         # Initialize the linear layers
         nn.init.xavier_uniform_(self.fc_out.weight, gain=1.4)
         nn.init.normal_(self.fc_out.bias, std=0.5)
+
+    def get_memory_info(self):
+        return self.memory, self.read_head.get_weights(), self.write_head.get_weights()
 
     def calculate_num_params(self):
         """Returns the total number of parameters."""

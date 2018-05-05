@@ -11,8 +11,11 @@ class Memory(nn.Module):
         self.M = M
         self.read_lengths = self.N + 1 + 1 + 3 + 1
         self.write_lengths = self.N + 1 + 1 + 3 + 1 + self.N + self.N
-
         self.w_last = torch.zeros([1, self.M], dtype=torch.float32)
+        self.reset_memory()
+
+    def get_weights(self):
+        return self.w_last
 
     def reset_memory(self):
         self.w_last = torch.zeros([1, self.M], dtype=torch.float32)
@@ -28,7 +31,6 @@ class Memory(nn.Module):
         return w
 
     def _similarity(self, k, β, memory):
-
         # Similarità coseno
         w = F.cosine_similarity(memory, k, -1, 1e-16)
         w = F.softmax(β * w, dim=-1)
@@ -54,7 +56,6 @@ class ReadHead(Memory):
         super(ReadHead, self).__init__(M, N, controller_out)
 
         print("--- Initialize Memory: ReadHead")
-
         self.fc_read = nn.Linear(controller_out, self.read_lengths)
         self.reset_parameters();
 
@@ -73,7 +74,7 @@ class ReadHead(Memory):
 
         k = F.tanh(k)
         β = F.softplus(β)
-        g = F.softplus(g)
+        g = F.sigmoid(g)
         s = F.softmax(s, dim=1)
         γ = 1 + F.softplus(γ)
 
@@ -89,7 +90,6 @@ class WriteHead(Memory):
         super(WriteHead, self).__init__(M, N, controller_out)
 
         print("--- Initialize Memory: WriteHead")
-
         self.fc_write = nn.Linear(controller_out, self.write_lengths)
         self.reset_parameters()
 

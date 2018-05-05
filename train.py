@@ -2,8 +2,9 @@ import torch
 import numpy as np
 import argparse
 from ntm import NTM
-from logger import Logger
 from time import time
+from tensorboardX import SummaryWriter
+import torchvision.utils as vutils
 
 def generate_copy_data(args):
     seq_len = args.sequence_length
@@ -25,9 +26,12 @@ def generate_copy_data(args):
 
     return inp.float(), outp.float()
 
+
 def clip_grads(net):
-    for p in net.parameters():
+    parameters = list(filter(lambda p: p.grad is not None, net.parameters()))
+    for p in parameters:
         p.grad.data.clamp_(args.min_grad, args.max_grad)
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -50,8 +54,10 @@ def parse_arguments():
                         help='Minimum value of gradient clipping', metavar='')
     parser.add_argument('--max_grad', type=float, default=10.,
                         help='Maximum value of gradient clipping', metavar='')
-    parser.add_argument('--logdir', type=str, default='./logs',
+    parser.add_argument('--logdir', type=str, default='./logs2',
                         help='The directory where to store logs', metavar='')
+    parser.add_argument('--loadmodel', type=str, default='',
+                        help='The pre-trained model checkpoint', metavar='')
 
     return parser.parse_args()
 
@@ -60,7 +66,7 @@ if __name__ == "__main__":
 
     args = parse_arguments()
 
-    logger = Logger(args.logdir)
+    writer = SummaryWriter()
 
     model = NTM(M=args.memory_capacity,
                 N=args.memory_vector_size,
@@ -78,6 +84,9 @@ if __name__ == "__main__":
     print("--------- Start training -----------")
 
     losses = []
+
+    if args.loadmodel != '':
+        model.load_state_dict(torch.load(args.loadmodel))
 
     # args.training_samples
     for e in range(0, args.training_samples):
@@ -108,7 +117,20 @@ if __name__ == "__main__":
         if (e % 50 == 0):
             mean_loss = np.array(losses[-50:]).mean()
             print("Loss: ", loss.item())
-            logger.scalar_summary("Mean Loss", loss.item(), e)
+            writer.add_scalar('Mean loss', loss.item(), e)
+            for name, param in model.named_parameters():
+                writer.add_histogram(name, param.clone().cpu().data.numpy(), e)
+            if (e % 1000 == 0):
+                mem_pic, read_pic, write_pic = model.get_memory_info()
+                pic1 = vutils.make_grid(y_pred, normalize=True, scale_each=True)
+                pic2 = vutils.make_grid(Y, normalize=True, scale_each=True)
+                pic3 = vutils.make_grid(mem_pic, normalize=True, scale_each=True)
+                pic4 = vutils.make_grid(read_pic, normalize=True, scale_each=True)
+                pic5 = vutils.make_grid(write_pic, normalize=True, scale_each=True)
+                writer.add_image('NTM output', pic1, e)
+                writer.add_image('True output', pic2, e)
+                writer.add_image('Memory', pic3, e)
+                writer.add_image('Read weights', pic4, e)
+                writer.add_image('Write weights', pic5, e)
+                torch.save(model.state_dict(), "checkpoint.model")
             losses = []
-
-        #print('Time elapsed: {}'.format(time() - tmp))
