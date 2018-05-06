@@ -21,6 +21,7 @@ optional arguments:
   --max_grad              Maximum value of gradient clipping (default: 10.0)
   --logdir                The directory where to store logs (default: logs)
   --loadmodel             The pre-trained model checkpoint (default: '')
+  --savemodel             Path/name to save model checkpoint (default: 'checkpoint.model')
 ```
 
 ### Results: <br>
