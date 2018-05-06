@@ -24,7 +24,7 @@ optional arguments:
   --savemodel             Path/name to save model checkpoint (default: 'checkpoint.model')
 ```
 
-### Results: <br>
+### Copy task: <br>
 <img src="http://i64.tinypic.com/5y7wnr.jpg" width="600">
 
 ### Memory snapshot: <br>
