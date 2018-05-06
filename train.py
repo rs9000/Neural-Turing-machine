@@ -5,26 +5,35 @@ from ntm import NTM
 from time import time
 from tensorboardX import SummaryWriter
 import torchvision.utils as vutils
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 
-def generate_copy_data(args):
-    seq_len = args.sequence_length
-    seq_width = args.token_size
-    seq = np.random.binomial(1, 0.5, (seq_len, seq_width))
-    seq = torch.from_numpy(seq)
-    seq.requires_grad = True
 
-    # Add delimiter token
-    inp = torch.zeros(seq_len + 2, seq_width)
-    inp[1:seq_len + 1, :seq_width] = seq.clone()
-    inp[0, 0] = 1.0
-    inp[seq_len + 1, seq_width - 1] = 1.0
-    outp = seq.data.clone()
+class BinaySeqDataset(Dataset):
 
-    # Add batch singleton dimension
-    inp = torch.unsqueeze(inp, dim=0)
-    outp = torch.unsqueeze(outp, dim=0)
+    def __init__(self, args):
+        self.seq_len = args.sequence_length
+        self.seq_width = args.token_size
+        self.dataset_dim = args.training_samples
 
-    return inp.float(), outp.float()
+    def _generate_seq(self):
+        seq = np.random.binomial(1, 0.5, (self.seq_len, self.seq_width))
+        seq = torch.from_numpy(seq)
+        # Add start and end token
+        inp = torch.zeros(self.seq_len + 2, self.seq_width)
+        inp[1:self.seq_len + 1, :self.seq_width] = seq.clone()
+        inp[0, 0] = 1.0
+        inp[self.seq_len + 1, self.seq_width - 1] = 1.0
+        outp = seq.data.clone()
+
+        return inp.float(), outp.float()
+
+    def __len__(self):
+        return self.dataset_dim
+
+    def __getitem__(self, idx):
+        inp, out = self._generate_seq()
+        return inp, out
 
 
 def clip_grads(net):
@@ -58,6 +67,8 @@ def parse_arguments():
                         help='The directory where to store logs', metavar='')
     parser.add_argument('--loadmodel', type=str, default='',
                         help='The pre-trained model checkpoint', metavar='')
+    parser.add_argument('--savemodel', type=str, default='checkpoint.model',
+                        help='Name/Path of model checkpoint', metavar='')
 
     return parser.parse_args()
 
@@ -65,8 +76,10 @@ def parse_arguments():
 if __name__ == "__main__":
 
     args = parse_arguments()
-
     writer = SummaryWriter()
+    dataset = BinaySeqDataset(args)
+    dataloader = DataLoader(dataset, batch_size=1,
+                            shuffle=True, num_workers=4)
 
     model = NTM(M=args.memory_capacity,
                 N=args.memory_vector_size,
@@ -88,8 +101,7 @@ if __name__ == "__main__":
     if args.loadmodel != '':
         model.load_state_dict(torch.load(args.loadmodel))
 
-    # args.training_samples
-    for e in range(0, args.training_samples):
+    for e, (X, Y) in enumerate(dataloader):
         tmp = time()
         model.initalize_state()
         optimizer.zero_grad()
@@ -97,7 +109,7 @@ if __name__ == "__main__":
         inp_seq_len = args.sequence_length + 2
         out_seq_len = args.sequence_length
 
-        X, Y = generate_copy_data(args)
+        X.requires_grad = True
 
         # Input rete: sequenza
         for t in range(0, inp_seq_len):
@@ -118,9 +130,9 @@ if __name__ == "__main__":
             mean_loss = np.array(losses[-50:]).mean()
             print("Loss: ", loss.item())
             writer.add_scalar('Mean loss', loss.item(), e)
-            for name, param in model.named_parameters():
-                writer.add_histogram(name, param.clone().cpu().data.numpy(), e)
             if (e % 1000 == 0):
+                for name, param in model.named_parameters():
+                    writer.add_histogram(name, param.clone().cpu().data.numpy(), e)
                 mem_pic, read_pic, write_pic = model.get_memory_info()
                 pic1 = vutils.make_grid(y_pred, normalize=True, scale_each=True)
                 pic2 = vutils.make_grid(Y, normalize=True, scale_each=True)
@@ -132,5 +144,5 @@ if __name__ == "__main__":
                 writer.add_image('Memory', pic3, e)
                 writer.add_image('Read weights', pic4, e)
                 writer.add_image('Write weights', pic5, e)
-                torch.save(model.state_dict(), "checkpoint.model")
+                torch.save(model.state_dict(), args.savemodel)
             losses = []
