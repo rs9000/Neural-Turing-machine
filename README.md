@@ -24,11 +24,14 @@ optional arguments:
   --savemodel             Path/name to save model checkpoint (default: 'checkpoint.model')
 ```
 
-### Copy task: <br>
+## Copy task: <br>
 <img src="http://i64.tinypic.com/5y7wnr.jpg" width="600">
 
 ### Memory snapshot: <br>
 <img src="http://i65.tinypic.com/2zq4hu1.jpg" width="300">
+
+### Writing and Reading addresses: <br>
+<img src="http://i64.tinypic.com/20zoboy.png" width="600">
 
 ### Loss: <br>
 <img src="http://i67.tinypic.com/33ksw3s.jpg" width="600">
