@@ -11,14 +11,15 @@ class Memory(nn.Module):
         self.M = M
         self.read_lengths = self.N + 1 + 1 + 3 + 1
         self.write_lengths = self.N + 1 + 1 + 3 + 1 + self.N + self.N
-        self.w_last = torch.zeros([1, self.M], dtype=torch.float32)
+        self.w_last = []
         self.reset_memory()
 
     def get_weights(self):
         return self.w_last
 
     def reset_memory(self):
-        self.w_last = torch.zeros([1, self.M], dtype=torch.float32)
+        self.w_last = []
+        self.w_last.append(torch.zeros([1, self.M], dtype=torch.float32))
 
     def address(self, k, β, g, s, γ, memory, w_last):
         # Content focus
@@ -78,8 +79,8 @@ class ReadHead(Memory):
         s = F.softmax(s, dim=1)
         γ = 1 + F.softplus(γ)
 
-        w = self.address(k, β, g, s, γ, memory, self.w_last)
-        self.w_last = w
+        w = self.address(k, β, g, s, γ, memory, self.w_last[-1])
+        self.w_last.append(w)
         mem = self.read(memory, w)
         return mem, w
 
@@ -125,8 +126,8 @@ class WriteHead(Memory):
         a = F.tanh(a)
         e = F.sigmoid(e)
 
-        w = self.address(k, β, g, s, γ, memory, self.w_last)
-        self.w_last = w
+        w = self.address(k, β, g, s, γ, memory, self.w_last[-1])
+        self.w_last.append(w)
         mem = self.write(memory, w, e, a)
         return mem, w
 

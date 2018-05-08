@@ -65,7 +65,7 @@ def parse_arguments():
                         help='Maximum value of gradient clipping', metavar='')
     parser.add_argument('--logdir', type=str, default='./logs2',
                         help='The directory where to store logs', metavar='')
-    parser.add_argument('--loadmodel', type=str, default='',
+    parser.add_argument('--loadmodel', type=str, default='checkpoint/checkpoint.model',
                         help='The pre-trained model checkpoint', metavar='')
     parser.add_argument('--savemodel', type=str, default='checkpoint.model',
                         help='Name/Path of model checkpoint', metavar='')
@@ -88,6 +88,8 @@ if __name__ == "__main__":
                 controller_out_dim=args.controller_output_dim,
                 controller_hid_dim=args.controller_hidden_dim,
                 )
+
+    print(model)
 
     criterion = torch.nn.BCELoss()
     optimizer = torch.optim.RMSprop(model.parameters(), lr=args.learning_rate)
@@ -126,11 +128,11 @@ if __name__ == "__main__":
         optimizer.step()
         losses += [loss.item()]
 
-        if (e % 50 == 0):
+        if e % 50 == 0:
             mean_loss = np.array(losses[-50:]).mean()
             print("Loss: ", loss.item())
             writer.add_scalar('Mean loss', loss.item(), e)
-            if (e % 1000 == 0):
+            if e % 1000 == 0:
                 for name, param in model.named_parameters():
                     writer.add_histogram(name, param.clone().cpu().data.numpy(), e)
                 mem_pic, read_pic, write_pic = model.get_memory_info()
